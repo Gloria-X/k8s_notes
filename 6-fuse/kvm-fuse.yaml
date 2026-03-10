@@ -1,12 +1,12 @@
 apiVersion: kubevirt.io/v1
 kind: VirtualMachine
 metadata:
-  name: kvm-fuse  # 已修改 VM 名称
+  name: kvm-linux-fuse
   namespace: kvm-builder-dev
 spec:
   dataVolumeTemplates:
   - metadata:
-      name: kvm-fuse  # 已同步修改 DataVolume 名称
+      name: kvm-linux-fuse
     spec:
       pvc:
         accessModes:
@@ -18,7 +18,7 @@ spec:
         volumeMode: Block
       source:
         snapshot:
-          name: pvc-cubjdrtvf-s
+          name: pvc-kgmgetgyt-s
           namespace: ""
   running: true
   template:
@@ -36,7 +36,6 @@ spec:
                 values:
                 - "3625"
             topologyKey: kubernetes.io/hostname
-      architecture: amd64
       domain:
         clock:
           timezone: Asia/Shanghai
@@ -57,8 +56,10 @@ spec:
             type: tablet
           interfaces:
           - bridge: {}
+            macAddress: "02:00:00:00:10:01"
             name: bridge
           - bridge: {}
+            macAddress: "02:00:00:00:10:02"
             name: default
         machine:
           type: q35
@@ -77,44 +78,87 @@ spec:
         pod: {}
       volumes:
       - dataVolume:
-          name: kvm-fuse  # 已同步修改关联的 DataVolume 名称
+          name: kvm-linux-fuse
         name: rootdisk
-              - name: cloudinitdisk
-        cloudInitNoCloud:  
+      - name: cloudinitdisk
+        cloudInitNoCloud:
+          networkData: |
+            version: 2
+            ethernets:
+              bridgenic:
+                match:
+                  macaddress: "02:00:00:00:10:01"
+                dhcp4: false
+                dhcp6: false
+                optional: true
+              podnic:
+                match:
+                  macaddress: "02:00:00:00:10:02"
+                dhcp4: true
+                dhcp6: true
+                optional: true
           userData: |
             #cloud-config
+            cloud_init_modules:
+              - seed_random
+              - bootcmd
+              - write_files
+              - growpart
+              - resizefs
+              - mounts
+              - set_hostname
+              - update_hostname
+              - update_etc_hosts
+              - users-groups
+              - ssh
+            cloud_config_modules:
+              - ssh_import_id
+              - set_passwords
+              - package_update_upgrade_install
+              - runcmd
+            cloud_final_modules:
+              - scripts_per_once
+              - scripts_per_boot
+              - scripts_per_instance
+              - scripts_user
+              - final_message
             disable_root: false
-            user: root
-            password: 123456
             chpasswd:
+              list: |
+                root:123456
               expire: false
             ssh_pwauth: true
-            ssh_authorized_keys:
             package_update: true
             package_upgrade: false
+            bootcmd:
+              - mkdir -p /data
             packages:
               - s3fs
               - fuse
-              - s3fs-fuse
             write_files:
-            - path: /etc/.passwd-s3fs
-              content: VTSFCESQB139A2AD10W0:PhCw6oSgVKKacxATZtNoMug7kJOJUd6xDCeJSxr3
-              permissions: '0600'
-            - path: /etc/fuse.conf
-              content: |
-                user_allow_other
-              permissions: '0644'
+              - path: /etc/.passwd-s3fs
+                content: user-storage:secret_5699761b4be947ce125de1f4
+                permissions: '0600'
+              - path: /etc/fuse.conf
+                content: |
+                  user_allow_other
+                permissions: '0644'
             mounts:
-              - [ "s3fs#test", "/data", "fuse", "url=https://s3.dev.tiusolution.com,passwd_file=/etc/.passwd-s3fs,use_path_request_style,allow_other,ssl_verify_hostname=0", "0", "0" ]
+              - [ "s3fs#user-storage:/3625", "/data", "fuse", "_netdev,url=https://s3.dev.tiusolution.com,passwd_file=/etc/.passwd-s3fs,use_path_request_style,allow_other,ssl_verify_hostname=0", "0", "0" ]
             runcmd:
-              - mkdir -p /data
-              - s3fs test /data -o passwd_file=/etc/.passwd-s3fs -o url=https://s3.dev.tiusolution.com -o use_path_request_style -o ssl_verify_hostname=0 -o nonempty
+              - mountpoint -q /data || mount /data
 
 # password明文会泄露，可生成哈希值openssl passwd -6 -salt salt12345 123456 或 python3 -c "import crypt; print(crypt.crypt('123456', crypt.mksalt(crypt.METHOD_SHA512)))"
 # ssh_pwauth: true显式启用，使得可通过ssh ubuntu@ip + 密码登录
 
 # kubectl apply -f kvm-fuse.yaml -n kvm-builder-dev
 
-# kubectl virt console kvm-fuse -n kvm-builder-dev
+# kubectl virt console kvm-linux-fuse -n kvm-builder-dev
 
-# virtctl console kvm-fuse -n kvm-builder-dev
+# virtctl console kvm-linux-fuse -n kvm-builder-dev
+
+# windows pvc-model-13-823
+
+#  apt update && apt install apt install cloud-init
+
+#  apt update && apt install apt install s3fs
