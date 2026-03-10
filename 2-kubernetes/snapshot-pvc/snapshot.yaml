@@ -1,0 +1,14 @@
+apiVersion: snapshot.storage.k8s.io/v1
+kind: VolumeSnapshot
+metadata:
+  name: base-snapshot
+spec:
+  volumeSnapshotClassName: lab-snapshot-class
+  source:
+    persistentVolumeClaimName: base-pvc
+
+# kubectl apply -f snapshot.yaml -n rens-test
+# kubectl get volumesnapshot -n rens-test
+# kubectl describe volumesnapshot base-snapshot -n rens-test
+
+# kubectl get volumesnapshotcontent snapcontent-237a4cf7-2e5d-4efd-8b72-218c3d8a0028 -n rens-test

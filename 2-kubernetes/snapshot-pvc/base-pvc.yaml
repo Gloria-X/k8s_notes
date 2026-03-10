@@ -1,0 +1,35 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: base-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: rook-ceph-block
+  resources:
+    requests:
+      storage: 10Gi
+---
+# 临时跑个 Pod 往母盘里塞点数据，模拟“实验环境已装好”
+apiVersion: v1
+kind: Pod
+metadata:
+  name: prep-base-data
+spec:
+  containers:
+  - name: writer
+    image: busybox
+    command: ["/bin/sh", "-c", "echo 'Student Lab V1.0' > /data/version.txt; sleep 3600"]
+    volumeMounts:
+    - name: data
+      mountPath: /data
+  volumes:
+  - name: data
+    persistentVolumeClaim:
+      claimName: base-pvc
+
+# kubectl apply -f base-pvc.yaml -n rens-test
+# kubectl exec -it prep-base-data -n rens-test -- sh
+# wget https://huggingface.co/microsoft/Phi-3-mini-4k-instruct
+
+# kubectl delete pod prep-base-data -n rens-test

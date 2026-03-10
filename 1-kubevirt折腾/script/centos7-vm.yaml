@@ -1,0 +1,38 @@
+# centos7-vm.yaml
+apiVersion: kubevirt.io/v1
+kind: VirtualMachine
+metadata:
+  name: centos7
+  namespace: ai-deliver
+spec:
+  running: true # 创建后立即启动
+  template:
+    metadata:
+      labels:
+        kubevirt.io/domain: centos7
+    spec:
+      domain:
+        cpu:
+          cores: 1
+        devices:
+          disks:
+            - name: disk
+              bootOrder: 1
+              disk:
+                bus: virtio
+          interfaces:
+            - name: default
+              masquerade: {}
+              model: virtio
+        machine:
+          type: q35
+        resources:
+          requests:
+            memory: 2G
+      networks:
+        - name: default
+          pod: {}
+      volumes:
+        - name: disk
+          persistentVolumeClaim:
+            claimName: centos7
